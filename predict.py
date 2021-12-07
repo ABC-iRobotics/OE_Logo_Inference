@@ -7,8 +7,9 @@ import matplotlib.patches as patches
 import cv2
 import sys
 import logging
+import os
 
-sys.path.insert(0, '../yolov5')
+sys.path.insert(0, os.path.join(os.path.split(os.path.dirname(os.path.abspath(__file__)))[0], 'yolov5'))
 
 from utils.torch_utils import select_device
 from models.common import DetectMultiBackend
@@ -30,10 +31,15 @@ class YOLO_v5_OE():
         arguments:
          - weights_pt_path (string): Path to the .pt file containing the weight of the model
         '''
+        self.log = logging.getLogger(__name__)
+        self.log.setLevel(logging.WARNING)
         matplotlib.use('TkAgg')
         self.device = select_device('')
         self.model = DetectMultiBackend(weights_pt_path, device=self.device, dnn=False)
-        logging.info('Loaded model!')
+        self.log.info('Loaded model!')
+
+    def set_loglevel(self, level=logging.WARNING):
+        self.log.setLevel(level)
 
 
     def predict(self, input_img):
@@ -68,8 +74,9 @@ class YOLO_v5_OE():
         pred = non_max_suppression(pred)
 
         # Visualize image
-        fig, ax = plt.subplots()
-        ax.imshow(cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB))
+        if self.log.level < logging.WARNING:
+            fig, ax = plt.subplots()
+            ax.imshow(cv2.cvtColor(input_img, cv2.COLOR_BGR2RGB))
 
         detection_result = []
 
@@ -87,9 +94,11 @@ class YOLO_v5_OE():
 
                     detection_result.append((conf.item(), int(classif.item()), (x_min,y_min,w,h)))
 
-                    rect = patches.Rectangle((x_min,y_min), w,h, linewidth=2, edgecolor='r', facecolor='none')
-                    ax.add_patch(rect)
-        plt.show()
+                    if self.log.level < logging.WARNING:
+                        rect = patches.Rectangle((x_min,y_min), w,h, linewidth=2, edgecolor='r', facecolor='none')
+                        ax.add_patch(rect)
+        if self.log.level < logging.WARNING:
+            plt.show()
 
         if detection_result:
             # There are detected logos, select the one with the highest confidence
@@ -114,24 +123,26 @@ class YOLO_v5_OE():
                 # If no circles were found allow finding the outer circle
                 circles = cv2.HoughCircles(gray_cropped,cv2.HOUGH_GRADIENT,1,int(cropped_smaller_dim/2),param1=50,param2=30,minRadius=2,maxRadius=int(cropped_smaller_dim/2))
 
-            fig, ax = plt.subplots()
-            ax.imshow(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
+            if self.log.level < logging.WARNING:
+                fig, ax = plt.subplots()
+                ax.imshow(cv2.cvtColor(cropped, cv2.COLOR_BGR2RGB))
 
             if not circles is None:
                 circles = np.uint16(np.around(circles))
-                for i in circles[0,:]:
-                    circ = patches.Circle((i[0],i[1]), i[2], linewidth=5, edgecolor='g', facecolor='none')
-                    circ_mid = patches.Circle((i[0],i[1]), 1, linewidth=5, edgecolor='r', facecolor='r')
-                    ax.add_patch(circ)
-                    ax.add_patch(circ_mid)
+                if self.log.level < logging.WARNING:
+                    for i in circles[0,:]:
+                        circ = patches.Circle((i[0],i[1]), i[2], linewidth=5, edgecolor='g', facecolor='none')
+                        circ_mid = patches.Circle((i[0],i[1]), 1, linewidth=5, edgecolor='r', facecolor='r')
+                        ax.add_patch(circ)
+                        ax.add_patch(circ_mid)
 
-                plt.show()
+                    plt.show()
                 return(xywh[0] + circles[0][0][0], xywh[1] + circles[0][0][1])
             else:
-                logging.warn('No circles found in the best-confidence bounding box!')
+                log.warn('No circles found in the best-confidence bounding box!')
                 return None
         else:
-            logging.warn('No OE logos found on the input image')
+            log.warn('No OE logos found on the input image')
             return None
 
 
@@ -139,5 +150,7 @@ class YOLO_v5_OE():
 if __name__=='__main__':
     model = YOLO_v5_OE('../../oe_logo_demo/best.pt')
     img_np = cv2.imread('../../oe_logo_demo/real1.png')
+
+    model.set_loglevel(logging.WARNING)
 
     print(model.predict(img_np))
