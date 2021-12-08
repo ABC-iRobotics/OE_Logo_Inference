@@ -139,10 +139,10 @@ class YOLO_v5_OE():
                     plt.show()
                 return(xywh[0] + circles[0][0][0], xywh[1] + circles[0][0][1])
             else:
-                log.warn('No circles found in the best-confidence bounding box!')
+                self.log.warn('No circles found in the best-confidence bounding box!')
                 return None
         else:
-            log.warn('No OE logos found on the input image')
+            self.log.warn('No OE logos found on the input image')
             return None
 
 
