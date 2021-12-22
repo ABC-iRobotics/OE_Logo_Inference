@@ -39,18 +39,32 @@ class YOLO_v5_OE():
         self.log.info('Loaded model!')
 
     def set_loglevel(self, level=logging.WARNING):
-        self.log.setLevel(level)
+        '''
+        Set loglevel of the YOLO_v5_OE class
 
+        arguments:
+         - level (enum (logging.levels)): Treshold level for logging (if smaller than WARNING will be set to DEBUG automatically)
+        '''
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(message)s')
+        handler.setFormatter(formatter)
+        self.log.addHandler(handler)
+        if level >= logging.WARNING:
+            self.log.setLevel(logging.WARNING)
+        else:
+            self.log.setLevel(logging.DEBUG)
 
-    def predict(self, input_img):
+    def predict(self, input_img, selection_criteria=0, return_raw_prediction=False):    # TODO: change selection_criteria type to function
         '''
         Infere the location of the OE logo on the image, with the highest prediction confidence
 
         arguments:
          - input_img (np.array): The image in BGR format as a numpy array (from cv2.imread())
+         - selection_criteria (int): determines witch detected object coordinates will be returned (0: highest confidence object, 1: object in th middle)
+         - return_raw_prediction (bool): if True: return all of the detection results as a list, False: return image coordinates tuple
 
         returns:
-         - detection_result (tuple): (u,v) image coordinates of the centerpoint of the "O" of the best detected OE logo
+         - detection_result (tuple): (u,v) image coordinates of detected object or list of all detection results
         '''
         # Get greater dimension of image
         img_larger_shape = input_img.shape[1] if input_img.shape[1] >= input_img.shape[0] else input_img.shape[0]
@@ -100,15 +114,29 @@ class YOLO_v5_OE():
         if self.log.level < logging.WARNING:
             plt.show()
 
-        if detection_result:
-            # There are detected logos, select the one with the highest confidence
+        if return_raw_prediction:
             detection_result.sort()
             a = list(reversed(detection_result))
-            detected_obj = a[0]
+            return a
 
-            xywh = detected_obj[2]  # Get xywh of highest-confidence logo
+        if detection_result:
+            detection_result.sort()
+            a = list(reversed(detection_result))
+            if selection_criteria == 0:
+                # There are detected logos, select the one with the highest confidence
+                detected_obj = a[0]
+            elif selection_criteria == 1:
+                # There are detected logos, select the one in the middle of the image
+                distances_from_center = []
+                for a_element in a:
+                    distances_from_center.append(abs(input_img.shape[1]/2 - (a_element[2][0] + a_element[2][2]/2)) + abs(input_img.shape[0]/2 - (a_element[2][1] + a_element[2][3]/2)))
+                detected_obj = a[np.array(distances_from_center).argmin()]
+            else:
+                detected_obj = a[0]
 
-            # Crop image to mounding-box and turn it into grayscale
+            xywh = detected_obj[2]  # Get xywh of selected logo
+
+            # Crop image to bounding-box and turn it into grayscale
             cropped = input_img[int(xywh[1]):int(xywh[1]+xywh[3]),int(xywh[0]):int(xywh[0]+xywh[2]),:]
             gray_cropped = cv2.cvtColor(cropped, cv2.COLOR_BGR2GRAY)
             gray_cropped = cv2.medianBlur(gray_cropped,5)
